@@ -19,8 +19,16 @@ source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-L
 ## Read in Data from SF
 
 policeDistricts_sf <- 
-  st_read("C:/Users/agarw/Documents/MUSA508/MUSA-508-Assignment-1/Data/Current Police Districts.geojson") %>%
+  st_read("./Data/Current Police Districts.geojson") %>% 
   st_transform('ESRI:102241')
+
+assualt <- 
+  read.socrata("https://data.sfgov.org/resource/tmnf-yvry.json") %>% 
+  filter(Category == "ASSAULT") %>%
+  st_as_sf(coords = c("X", "Y"), crs = 4326, agr = "constant")%>%
+  st_transform('ESRI:102241') %>% 
+  distinct()
+
 
 
 
