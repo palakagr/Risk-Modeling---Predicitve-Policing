@@ -87,9 +87,6 @@ yy <- mapview::mapview(mutate(assualt, ID = seq(1:n())))
 xx + yy
 
 ## Modeling Spatial Features
-j <- read.socrata("https://data.sfgov.org/resource/vw6y-z8j6.json?service_name=Encampments")
-j <- j %>% filter(closed_date > as.POSIXct("2016-01-01") & closed_date < as.POSIXct("2017-01-01"))
-j <- j %>% filter(service_subtype == "Encampment Reports")
 
 Encampments <- 
   read.socrata("https://data.sfgov.org/resource/vw6y-z8j6.json?service_name=Encampments") %>%
@@ -143,7 +140,7 @@ Homeless <-
   dplyr::select(Y = lat, X = long) %>%
   na.omit() %>%
   st_as_sf(coords = c("X", "Y"), crs = 4326, agr = "constant") %>%
-  st_transform(st_crs(fishnet)) %>%
+  st_transform(st_crs(fishnet)) %>% 
   mutate(Legend = "Homeless")
 
 #Bar
@@ -164,9 +161,27 @@ bars <-
   bars$osm_points %>%
   .[sfbase,]
 
-bars <- bars %>% st_transform(st_crs(fishnet)) %>% mutate(Legend = 'Bar')
+bars <- bars %>% st_transform(st_crs(fishnet)) %>% 
+  mutate(Legend = 'Bar') %>% 
+  dplyr::select(geometry, Legend)
 
-bars <- data.frame(bars$geometry, bars$Legend)
+
+
+parks <-
+  st_read("C:/Users/agarw/Documents/MUSA508/MUSA508-Assignment3/Data/Recreation_and_Parks_Properties.csv") %>%
+  dplyr::select(Y = Latitude, X = Longitude) %>%
+  na.omit() %>%
+  st_as_sf(coords = c("X", "Y"), crs = 4326, agr = "constant") %>%
+  st_transform(st_crs(fishnet)) %>%
+  mutate(Legend = "Park")
+
+Liquor <-
+  st_read("C:/Users/agarw/Documents/MUSA508/MUSA508-Assignment3/Data/Registered_Business_Locations_-_San_Francisco.csv") %>% 
+  filter(str_detect(Liquor$DBA.Name, "Liquor")) %>%
+  mutate(geometry = Business.Location) %>%
+  spli <- strsplit(Liquor$geometry, " ")
+
+
 
 drug <- 
   read.socrata("https://data.sfgov.org/resource/tmnf-yvry.json") %>% 
@@ -187,26 +202,45 @@ DomesticViolence <-
   st_transform('ESRI:102241') %>% 
   distinct()
 
+ggplot() +
+  geom_sf(data=sfbase, fill="black") +
+  geom_sf(data=assualt, colour="red", size=.75)+
+  geom_sf(data=DomesticViolence, colour="blue", size=.75)
 
-
-liquorRetail <- 
-  read.socrata("https://data.cityofchicago.org/resource/nrmj-3kcf.json") %>%  
-  filter(business_activity == "Retail Sales of Packaged Liquor") %>%
-  dplyr::select(Y = latitude, X = longitude) %>%
-  na.omit() %>%
-  st_as_sf(coords = c("X", "Y"), crs = 4326, agr = "constant") %>%
+## Neighborhoods to use in LOOCV in a bit
+neighborhoods <- 
+  st_read("https://data.sfgov.org/api/geospatial/pty2-tcw4?method=export&format=GeoJSON") %>%
   st_transform(st_crs(fishnet)) %>%
-  mutate(Legend = "Liquor_Retail")
+  dplyr::select(-link)
 
-Liquor <-
-  st_read("C:/Users/agarw/Documents/MUSA508/MUSA508-Assignment3/Data/Registered_Business_Locations_-_San_Francisco.csv")
+#### Aggregate a feature to our fishnet
 
+vars_net <- rbind(Encampments, Streetlights, Graffiti, NoiseReport, AbandonedCar, bars, parks) %>%
+  st_join(., fishnet, join=st_within) %>%
+  st_drop_geometry() %>%
+  group_by(uniqueID, Legend) %>%
+  summarize(count = n()) %>%
+  full_join(fishnet, by = "uniqueID") %>%
+  spread(Legend, count, fill=0) %>%
+  st_sf() %>%
+  dplyr::select(-`<NA>`) %>%
+  na.omit() %>%
+  ungroup()
 
-Liquor <- Liquor %>% filter(str_detect(Liquor$DBA.Name, "Liquor"))
+## Plot the risks
+vars_net.long <- 
+  gather(vars_net, Variable, value, -geometry, -uniqueID)
 
-Liquor <- Liquor %>% mutate(geometry = Business.Location)
+vars <- unique(vars_net.long$Variable)
+mapList <- list()
 
-Liquor <- Liquor %>% mutate(Ge=paste(Business.Location, sep=" ")) %>%
-  dummy_cols(select_columns="Ge", split=" ")
+for(i in vars){
+  mapList[[i]] <- 
+    ggplot() +
+    geom_sf(data = filter(vars_net.long, Variable == i), aes(fill=value), colour=NA) +
+    scale_fill_viridis(name="") +
+    labs(title=i) +
+    mapTheme()}
 
-spli <- strsplit(Liquor$geometry, " ")
+do.call(grid.arrange,c(mapList, ncol =3, top = "Risk Factors by Fishnet"))
+
