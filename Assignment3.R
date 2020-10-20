@@ -13,6 +13,7 @@ library(kableExtra)
 library(tidycensus)
 library(mapview)
 library(osmdata)
+library(fastDummies)
 # functions
 root.dir = "https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/DATA/"
 source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
@@ -145,6 +146,49 @@ Homeless <-
   st_transform(st_crs(fishnet)) %>%
   mutate(Legend = "Homeless")
 
+#Bar
+sfbase <-
+  st_read("https://data.sfgov.org/api/geospatial/p5b7-5n3h?method=export&format=GeoJSON") %>% 
+  st_union()
+
+xmin = st_bbox(sfbase)[[1]]
+ymin = st_bbox(sfbase)[[2]]
+xmax = st_bbox(sfbase)[[3]]  
+ymax = st_bbox(sfbase)[[4]]
+
+bars <- opq(bbox = c(xmin, ymin, xmax, ymax)) %>% 
+  add_osm_feature(key = 'amenity', value = c("bar", "pub", "restaurant")) %>%
+  osmdata_sf()
+
+bars <- 
+  bars$osm_points %>%
+  .[sfbase,]
+
+bars <- bars %>% st_transform(st_crs(fishnet)) %>% mutate(Legend = 'Bar')
+
+bars <- data.frame(bars$geometry, bars$Legend)
+
+drug <- 
+  read.socrata("https://data.sfgov.org/resource/tmnf-yvry.json") %>% 
+  filter(category == "DRUG/NARCOTIC" & date > as.POSIXct("2016-01-01") & date < as.POSIXct("2017-01-01") ) %>%  
+  st_as_sf(coords = c("x", "y"), crs = 4326, agr = "constant")%>%
+  st_transform('ESRI:102241') %>% 
+  distinct()
+
+ggplot() +
+  geom_sf(data=sfbase, fill="black") +
+  geom_sf(data=assualt, colour="red", size=.75)+
+  geom_sf(data=drug, colour="blue", size=.75)
+
+DomesticViolence <- 
+  read.socrata("https://data.sfgov.org/resource/tmnf-yvry.json") %>% 
+  filter(descript == "DOMESTIC VIOLENCE" & date > as.POSIXct("2016-01-01") & date < as.POSIXct("2017-01-01") ) %>%  
+  st_as_sf(coords = c("x", "y"), crs = 4326, agr = "constant")%>%
+  st_transform('ESRI:102241') %>% 
+  distinct()
+
+
+
 liquorRetail <- 
   read.socrata("https://data.cityofchicago.org/resource/nrmj-3kcf.json") %>%  
   filter(business_activity == "Retail Sales of Packaged Liquor") %>%
@@ -154,24 +198,15 @@ liquorRetail <-
   st_transform(st_crs(fishnet)) %>%
   mutate(Legend = "Liquor_Retail")
 
-sfCounty <- st_transform(sfCounty,'ESRI:37001' )
-
-xmin = st_bbox(sfCounty)[[1]]
-ymin = st_bbox(sfCounty)[[2]]
-xmax = st_bbox(sfCounty)[[3]]  
-ymax = st_bbox(sfCounty)[[4]]
-
-bars <- opq(bbox = c(xmin, ymin, xmax, ymax)) %>% 
-  add_osm_feature(key = 'amenity', value = c("bar", "pub")) %>%
-  osmdata_sf()
-
-bars <- 
-  st_transform(st_crs(sfCounty)) %>%
-  bars$osm_points %>%
-  .[sfCounty,]
-
-bars <- bars %>% st_transform('ESRI:102658')
+Liquor <-
+  st_read("C:/Users/agarw/Documents/MUSA508/MUSA508-Assignment3/Data/Registered_Business_Locations_-_San_Francisco.csv")
 
 
+Liquor <- Liquor %>% filter(str_detect(Liquor$DBA.Name, "Liquor"))
 
+Liquor <- Liquor %>% mutate(geometry = Business.Location)
 
+Liquor <- Liquor %>% mutate(Ge=paste(Business.Location, sep=" ")) %>%
+  dummy_cols(select_columns="Ge", split=" ")
+
+spli <- strsplit(Liquor$geometry, " ")
