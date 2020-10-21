@@ -36,30 +36,6 @@ assualt <-
   st_transform('ESRI:102241') %>% 
   distinct()
 
-drug <- 
-  read.socrata("https://data.sfgov.org/resource/tmnf-yvry.json") %>% 
-  filter(category == "DRUG/NARCOTIC" & date > as.POSIXct("2017-01-01") & date < as.POSIXct("2018-01-01") ) %>%  
-  st_as_sf(coords = c("x", "y"), crs = 4326, agr = "constant")%>%
-  st_transform('ESRI:102241') %>% 
-  distinct()
-
-ggplot() +
-  geom_sf(data=sfbase, fill="black") +
-  geom_sf(data=assualt, colour="red", size=.75)+
-  geom_sf(data=drug, colour="blue", size=.75)
-
-DomesticViolence <- 
-  read.socrata("https://data.sfgov.org/resource/tmnf-yvry.json") %>% 
-  filter(descript == "DOMESTIC VIOLENCE" & date > as.POSIXct("2017-01-01") & date < as.POSIXct("2018-01-01") ) %>%  
-  st_as_sf(coords = c("x", "y"), crs = 4326, agr = "constant")%>%
-  st_transform('ESRI:102241') %>% 
-  distinct()
-
-ggplot() +
-  geom_sf(data=sfbase, fill="black") +
-  geom_sf(data=assualt, colour="red", size=.75)+
-  geom_sf(data=DomesticViolence, colour="blue", size=.75)
-
 # uses grid.arrange to organize independent plots
 grid.arrange(ncol=2,
              ggplot() + 
@@ -109,10 +85,10 @@ domestic_net <-
                        size=nrow(fishnet), replace = TRUE))
 
 drug_net <-
-  dplyr::select(DomesticViolence) %>% 
+  dplyr::select(drug) %>% 
   mutate(countDrug = 1) %>% 
   aggregate(., fishnet, sum) %>%
-  mutate(countDom = replace_na(countDrug, 0),
+  mutate(countDrug = replace_na(countDrug, 0),
          uniqueID = rownames(.),
          cvID = sample(round(nrow(fishnet) / 24), 
                        size=nrow(fishnet), replace = TRUE))
@@ -207,8 +183,6 @@ bars <- bars %>% st_transform(st_crs(fishnet)) %>%
   mutate(Legend = 'Bar') %>% 
   dplyr::select(geometry, Legend)
 
-
-
 parks <-
   st_read("C:/Users/agarw/Documents/MUSA508/MUSA508-Assignment3/Data/Recreation_and_Parks_Properties.csv") %>%
   dplyr::select(Y = Latitude, X = Longitude) %>%
@@ -220,8 +194,46 @@ parks <-
 Liquor <-
   st_read("C:/Users/agarw/Documents/MUSA508/MUSA508-Assignment3/Data/Registered_Business_Locations_-_San_Francisco.csv") %>% 
   filter(str_detect(Liquor$DBA.Name, "Liquor")) %>%
-  mutate(geometry = Business.Location) %>%
-  spli <- strsplit(Liquor$geometry, " ")
+  mutate(g = str_remove_all(Business.Location, "[POINT()]")) %>%
+  separate(., col = g,into = c("g","X","Y"), sep = " ")%>% 
+  dplyr::select(Y, X) %>%
+  na.omit() %>%
+  st_as_sf(coords = c("X", "Y"), crs = 4326, agr = "constant") %>%
+  st_transform(st_crs(fishnet)) %>%
+  mutate(Legend = "Liquor")
+
+drug <- 
+  read.socrata("https://data.sfgov.org/resource/tmnf-yvry.json") %>% 
+  filter(category == "DRUG/NARCOTIC" & date > as.POSIXct("2017-01-01") & date < as.POSIXct("2018-01-01") ) %>%  
+  st_as_sf(coords = c("x", "y"), crs = 4326, agr = "constant")%>%
+  st_transform('ESRI:102241') %>% 
+  distinct()
+
+ggplot() +
+  geom_sf(data=sfbase, fill="black") +
+  geom_sf(data=assualt, colour="red", size=.75)+
+  geom_sf(data=drug, colour="blue", size=.75)+
+  labs(title="Assualt and Drug cases")
+
+DomesticViolence <- 
+  read.socrata("https://data.sfgov.org/resource/tmnf-yvry.json") %>% 
+  filter(descript == "DOMESTIC VIOLENCE" & date > as.POSIXct("2017-01-01") & date < as.POSIXct("2018-01-01") ) %>%  
+  st_as_sf(coords = c("x", "y"), crs = 4326, agr = "constant")%>%
+  st_transform('ESRI:102241') %>% 
+  distinct()
+
+ggplot() +
+  geom_sf(data=sfbase, fill="black") +
+  geom_sf(data=assualt, colour="red", size=.75)+
+  geom_sf(data=DomesticViolence, colour="blue", size=.75)
+
+correlation_dom = cor(domestic_net$countDom, crime_net$countAssualt, use = "complete.obs")
+correlation_dom
+correlation_drug = cor(drug_net$countDrug, crime_net$countAssualt, use = "complete.obs")
+correlation_drug
+
+plot(drug_net$countDrug, crime_net$countAssualt)
+plot(domestic_net$countDom, crime_net$countAssualt)
 
 ## Neighborhoods to use in LOOCV in a bit
 neighborhoods <- 
@@ -231,7 +243,7 @@ neighborhoods <-
 
 #### Aggregate a feature to our fishnet
 
-vars_net <- rbind(Encampments, Streetlights, Graffiti, NoiseReport, AbandonedCar, bars, parks) %>%
+vars_net <- rbind(Encampments, Streetlights, Graffiti, NoiseReport, AbandonedCar, bars, parks, Liquor) %>%
   st_join(., fishnet, join=st_within) %>%
   st_drop_geometry() %>%
   group_by(uniqueID, Legend) %>%
@@ -437,13 +449,6 @@ ggplot(correlation.long, aes(Value, countAssualt)) +
   facet_wrap(~Variable, ncol = 2, scales = "free") +
   labs(title = "Assualt count as a function of risk factors") +
   plotTheme()
-
-
-correlation_dom = cor(domestic_net$countDom, crime_net$countAssualt, use = "complete.obs")
-correlation_dom
-correlation_drug = cor(drug_net$countDom, crime_net$countAssualt, use = "complete.obs")
-correlation_drug
-
 
 ## Regression
 reg.vars <- c("Encampments.nn3", "Abandoned_Cars.nn3", "Graffiti.nn3", 
