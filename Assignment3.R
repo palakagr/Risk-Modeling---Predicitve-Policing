@@ -695,7 +695,7 @@ rbind(assualt_KDE_sf, assualt_risk_sf) %>%
   gather(Variable, Value, -label, -Risk_Category, -geometry) %>%
   ggplot() +
   geom_sf(aes(fill = Risk_Category), colour = NA) +
-  geom_sf(data = sample_n(assualt18, 3000), size = .5, colour = "black") +
+  geom_sf(data = sample_n(assualt18, 2000), size = .5, colour = "black") +
   facet_wrap(~label, ) +
   scale_fill_viridis(discrete = TRUE) +
   labs(title="Comparison of Kernel Density and Risk Predictions",
