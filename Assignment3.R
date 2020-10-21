@@ -286,32 +286,39 @@ nn_function <- function(measureFrom,measureTo,k) {
 st_c<- st_coordinates
 st_coid <- st_centroid
 
+Encampments_coord <- data.frame(st_c(Encampments)) %>% na.omit()
+AbandonedCar_coord <- data.frame(st_c(AbandonedCar)) %>% na.omit()
+Graffiti_coord <- data.frame(st_c(Graffiti)) %>% na.omit()
+Streetlights_coord <- data.frame(st_c(Streetlights)) %>% na.omit()
+NoiseReport_coord <- data.frame(st_c(NoiseReport)) %>% na.omit()
+Bars_coord <- data.frame(st_c(bars)) %>% na.omit()
+Parks_coord <- data.frame(st_c(parks)) %>% na.omit()
+
+
 ## create NN from abandoned cars
-vars_net <- vars_net %>%
-  mutate(n = nn_function(st_c(st_coid(vars_net)), st_c(Encampments),3))
 
 ## try one with 3
 vars_net <-
   vars_net %>%
   mutate(
     Encampments.nn3 =
-      nn_function(st_c(st_coid(vars_net)), st_c(Encampments),3),
+      nn_function(st_c(st_coid(vars_net)), Encampments_coord,3),
     Abandoned_Cars.nn3 =
-      nn_function(st_c(st_coid(vars_net)), st_c(AbandonCars),3),
+      nn_function(st_c(st_coid(vars_net)), AbandonedCar_coord,3),
     Graffiti.nn3 =
-      nn_function(st_c(st_coid(vars_net)), st_c(Graffiti),3),
+      nn_function(st_c(st_coid(vars_net)), Graffiti_coord,3),
     Bars.nn3 =
-      nn_function(st_c(st_coid(vars_net)), st_c(bars),3),
+      nn_function(st_c(st_coid(vars_net)), Bars_coord,3),
     Streetlights.nn3 = 
-      nn_function(st_c(st_coid(vars_net)), st_c(Streetlights),3),
+      nn_function(st_c(st_coid(vars_net)), Streetlights_coord,3),
     NoiseReport.nn3 =
-      nn_function(st_c(st_coid(vars_net)), st_c(NoiseReport),3),
+      nn_function(st_c(st_coid(vars_net)), NoiseReport_coord,3),
     Parks.nn3 =
-      nn_function(st_c(st_coid(vars_net)), st_c(parks),3))
+      nn_function(st_c(st_coid(vars_net)), Parks_coord,3))
 
 ## Plot nearest neighbor
 vars_net.long.nn <- 
-  dplyr::select(vars_net, ends_with(".nn")) %>%
+  dplyr::select(vars_net, ends_with(".nn3")) %>%
   gather(Variable, value, -geometry)
 
 vars <- unique(vars_net.long.nn$Variable)
@@ -407,7 +414,7 @@ final_net <-
 ggplot() +
   geom_sf(data = final_net, aes(fill=Assualt.isSig.dist), colour=NA) +
   scale_fill_viridis(name="NN Distance") +
-  labs(title="Abandoned Car NN Distance") +
+  labs(title="Assualt NN Distance") +
   mapTheme()
 
 ## Correlation
@@ -439,13 +446,13 @@ correlation_drug
 
 
 ## Regression
-reg.vars <- c("Abandoned_Buildings.nn", "Abandoned_Cars.nn", "Graffiti.nn", 
-              "Liquor_Retail.nn", "Street_Lights_Out.nn", "Sanitation.nn", 
+reg.vars <- c("Encampments.nn3", "Abandoned_Cars.nn3", "Graffiti.nn3", 
+              "Bars.nn3", "Streetlights.nn3", "NoiseReport.nn3", "Parks.nn3",
               "loopDistance")
 
-reg.ss.vars <- c("Abandoned_Buildings.nn", "Abandoned_Cars.nn", "Graffiti.nn", 
-                 "Liquor_Retail.nn", "Street_Lights_Out.nn", "Sanitation.nn", 
-                 "loopDistance", "burglary.isSig", "burglary.isSig.dist")
+reg.ss.vars <- c("Encampments.nn3", "Abandoned_Cars.nn3", "Graffiti.nn3", 
+                 "Bars.nn3", "Streetlights.nn3", "NoiseReport.nn3", "Parks.nn3",
+                 "loopDistance", "Assualt.isSig", "Assualt.isSig.dist")
 
 crossValidate <- function(dataset, id, dependentVariable, indVariables) {
   
@@ -523,7 +530,7 @@ reg.summary <-
 error_by_reg_and_fold <- 
   reg.summary %>%
   group_by(Regression, cvID) %>% 
-  summarize(Mean_Error = mean(Prediction - countBurglaries, na.rm = T),
+  summarize(Mean_Error = mean(Prediction - countAssualt, na.rm = T),
             MAE = mean(abs(Mean_Error), na.rm = T),
             SD_MAE = mean(abs(Mean_Error), na.rm = T)) %>%
   ungroup()
@@ -535,3 +542,22 @@ error_by_reg_and_fold %>%
   geom_vline(xintercept = 0) + scale_x_continuous(breaks = seq(0, 8, by = 1)) + 
   labs(title="Distribution of MAE", subtitle = "k-fold cross validation vs. LOGO-CV",
        x="Mean Absolute Error", y="Count") 
+
+st_drop_geometry(error_by_reg_and_fold) %>%
+  group_by(Regression) %>% 
+  summarize(Mean_MAE = round(mean(MAE), 2),
+            SD_MAE = round(sd(MAE), 2)) %>%
+  kable(caption = "MAE by regression") %>%
+  kable_styling("striped", full_width = F) %>%
+  row_spec(2, color = "black", background = "#FDE725FF") %>%
+  row_spec(4, color = "black", background = "#FDE725FF") 
+
+error_by_reg_and_fold %>%
+  filter(str_detect(Regression, "LOGO")) %>%
+  ggplot() +
+  geom_sf(aes(fill = MAE)) +
+  facet_wrap(~Regression) +
+  scale_fill_viridis() +
+  labs(title = "Assualt errors by LOGO-CV Regression") +
+  mapTheme() + theme(legend.position="bottom")
+
