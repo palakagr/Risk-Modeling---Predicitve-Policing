@@ -31,14 +31,14 @@ policeDistricts_sf <-
 
 assualt <- 
   read.socrata("https://data.sfgov.org/resource/tmnf-yvry.json") %>% 
-  filter(category == "ASSAULT" & date > as.POSIXct("2016-01-01") & date < as.POSIXct("2017-01-01") ) %>%  
+  filter(category == "ASSAULT" & date > as.POSIXct("2017-01-01") & date < as.POSIXct("2018-01-01") ) %>%  
   st_as_sf(coords = c("x", "y"), crs = 4326, agr = "constant")%>%
   st_transform('ESRI:102241') %>% 
   distinct()
 
 drug <- 
   read.socrata("https://data.sfgov.org/resource/tmnf-yvry.json") %>% 
-  filter(category == "DRUG/NARCOTIC" & date > as.POSIXct("2016-01-01") & date < as.POSIXct("2017-01-01") ) %>%  
+  filter(category == "DRUG/NARCOTIC" & date > as.POSIXct("2017-01-01") & date < as.POSIXct("2018-01-01") ) %>%  
   st_as_sf(coords = c("x", "y"), crs = 4326, agr = "constant")%>%
   st_transform('ESRI:102241') %>% 
   distinct()
@@ -50,7 +50,7 @@ ggplot() +
 
 DomesticViolence <- 
   read.socrata("https://data.sfgov.org/resource/tmnf-yvry.json") %>% 
-  filter(descript == "DOMESTIC VIOLENCE" & date > as.POSIXct("2016-01-01") & date < as.POSIXct("2017-01-01") ) %>%  
+  filter(descript == "DOMESTIC VIOLENCE" & date > as.POSIXct("2017-01-01") & date < as.POSIXct("2018-01-01") ) %>%  
   st_as_sf(coords = c("x", "y"), crs = 4326, agr = "constant")%>%
   st_transform('ESRI:102241') %>% 
   distinct()
@@ -560,4 +560,159 @@ error_by_reg_and_fold %>%
   scale_fill_viridis() +
   labs(title = "Assualt errors by LOGO-CV Regression") +
   mapTheme() + theme(legend.position="bottom")
+
+neighborhood.weights <-
+  filter(error_by_reg_and_fold, Regression == "Spatial LOGO-CV: Spatial Process") %>%
+  group_by(cvID) %>%
+  poly2nb(as_Spatial(.), queen=TRUE) %>%
+  nb2listw(., style="W", zero.policy=TRUE)
+
+filter(error_by_reg_and_fold, str_detect(Regression, "LOGO"))  %>% 
+  st_drop_geometry() %>%
+  group_by(Regression) %>%
+  summarize(Morans_I = moran.mc(abs(Mean_Error), neighborhood.weights, 
+                                nsim = 999, zero.policy = TRUE, 
+                                na.action=na.omit)[[1]],
+            p_value = moran.mc(abs(Mean_Error), neighborhood.weights, 
+                               nsim = 999, zero.policy = TRUE, 
+                               na.action=na.omit)[[3]])
+
+
+st_drop_geometry(reg.summary) %>%
+  group_by(Regression) %>%
+  mutate(Assualt_Decile = ntile(countAssualt, 10)) %>%
+  group_by(Regression, Assualt_Decile) %>%
+  summarize(meanObserved = mean(countAssualt, na.rm=T),
+            meanPrediction = mean(Prediction, na.rm=T)) %>%
+  gather(Variable, Value, -Regression, -Assualt_Decile) %>%          
+  ggplot(aes(Assualt_Decile, Value, shape = Variable)) +
+  geom_point(size = 2) + geom_path(aes(group = Assualt_Decile), colour = "black") +
+  scale_shape_manual(values = c(2, 17)) +
+  facet_wrap(~Regression) + xlim(0,10) +
+  labs(title = "Predicted and observed assualt by observed assualt decile")
+
+tracts18 <- 
+  get_acs(geography = "tract", variables = c("B01001_001E","B01001A_001E"), 
+          year = 2018, state=06, county=075, geometry=T) %>%
+  st_transform('ESRI:102241')  %>% 
+  dplyr::select(variable, estimate, GEOID) %>%
+  spread(variable, estimate) %>%
+  rename(TotalPop = B01001_001,
+         NumberWhites = B01001A_001) %>%
+  mutate(percentWhite = NumberWhites / TotalPop,
+         raceContext = ifelse(percentWhite > .5, "Majority_White", "Majority_Non_White")) %>%
+  .[neighborhoods,]
+
+reg.summary %>% 
+  filter(str_detect(Regression, "LOGO")) %>%
+  st_centroid() %>%
+  st_join(tracts18) %>%
+  na.omit() %>%
+  st_drop_geometry() %>%
+  group_by(Regression, raceContext) %>%
+  summarize(mean.Error = mean(Error, na.rm = T)) %>%
+  spread(raceContext, mean.Error) %>%
+  kable(caption = "Mean Error by neighborhood racial context") %>%
+  kable_styling("striped", full_width = F) 
+
+## Density vs predictions
+assualt_ppp <- as.ppp(st_coordinates(assualt), W = st_bbox(final_net))
+assualt_KD.1000 <- spatstat::density.ppp(assualt_ppp, 1000)
+assualt_KD.1500 <- spatstat::density.ppp(assualt_ppp, 1500)
+assualt_KD.2000 <- spatstat::density.ppp(assualt_ppp, 2000)
+assualt_KD.df <- rbind(
+  mutate(data.frame(rasterToPoints(mask(raster(assualt_KD.1000), as(neighborhoods, 'Spatial')))), Legend = "1000 Ft."),
+  mutate(data.frame(rasterToPoints(mask(raster(assualt_KD.1500), as(neighborhoods, 'Spatial')))), Legend = "1500 Ft."),
+  mutate(data.frame(rasterToPoints(mask(raster(assualt_KD.2000), as(neighborhoods, 'Spatial')))), Legend = "2000 Ft.")) 
+
+assualt_KD.df$Legend <- factor(assualt_KD.df$Legend, levels = c("1000 Ft.", "1500 Ft.", "2000 Ft."))
+
+ggplot(data=assualt_KD.df, aes(x=x, y=y)) +
+  geom_raster(aes(fill=layer)) + 
+  facet_wrap(~Legend) +
+  coord_sf(crs=st_crs(final_net)) + 
+  scale_fill_viridis(name="Density") +
+  labs(title = "Kernel density with 3 different search radii") +
+  mapTheme(title_size = 14)
+
+as.data.frame(assualt_KD.1000) %>%
+  st_as_sf(coords = c("x", "y"), crs = st_crs(final_net)) %>%
+  aggregate(., final_net, mean) %>%
+  ggplot() +
+  geom_sf(aes(fill=value)) +
+  geom_sf(data = sample_n(assualt, 1500), size = .5) +
+  scale_fill_viridis(name = "Density") +
+  labs(title = "Kernel density of 2017 Assualt") +
+  mapTheme(title_size = 14)
+
+assualt18 <- 
+  read.socrata("https://data.sfgov.org/resource/tmnf-yvry.json") %>% 
+  filter(category == "ASSAULT" & date > as.POSIXct("2018-01-01") & date < as.POSIXct("2019-01-01") ) %>%  
+  st_as_sf(coords = c("x", "y"), crs = 4326, agr = "constant")%>%
+  st_transform('ESRI:102241') %>% 
+  distinct()%>%
+  .[fishnet,]
+
+assualt_ppp <- as.ppp(st_coordinates(assualt), W = st_bbox(final_net))
+assualt_KD <- spatstat::density.ppp(assualt_ppp, 1000)
+
+assualt_KDE_sf <- as.data.frame(assualt_KD) %>%
+  st_as_sf(coords = c("x", "y"), crs = st_crs(final_net)) %>%
+  aggregate(., final_net, mean) %>%
+  mutate(label = "Kernel Density",
+         Risk_Category = ntile(value, 100),
+         Risk_Category = case_when(
+           Risk_Category >= 90 ~ "90% to 100%",
+           Risk_Category >= 70 & Risk_Category <= 89 ~ "70% to 89%",
+           Risk_Category >= 50 & Risk_Category <= 69 ~ "50% to 69%",
+           Risk_Category >= 30 & Risk_Category <= 49 ~ "30% to 49%",
+           Risk_Category >= 1 & Risk_Category <= 29 ~ "1% to 29%")) %>%
+  cbind(
+    aggregate(
+      dplyr::select(assualt18) %>% mutate(assualtCount = 1), ., sum) %>%
+      mutate(assualtCount = replace_na(assualtCount, 0))) %>%
+  dplyr::select(label, Risk_Category, assualtCount)
+
+assualt_risk_sf <-
+  filter(reg.summary, Regression == "Spatial LOGO-CV: Spatial Process") %>%
+  mutate(label = "Risk Predictions",
+         Risk_Category = ntile(Prediction, 100),
+         Risk_Category = case_when(
+           Risk_Category >= 90 ~ "90% to 100%",
+           Risk_Category >= 70 & Risk_Category <= 89 ~ "70% to 89%",
+           Risk_Category >= 50 & Risk_Category <= 69 ~ "50% to 69%",
+           Risk_Category >= 30 & Risk_Category <= 49 ~ "30% to 49%",
+           Risk_Category >= 1 & Risk_Category <= 29 ~ "1% to 29%")) %>%
+  cbind(
+    aggregate(
+      dplyr::select(assualt18) %>% mutate(assualtCount = 1), ., sum) %>%
+      mutate(assualtCount = replace_na(assualtCount, 0))) %>%
+  dplyr::select(label,Risk_Category, assualtCount)
+
+
+rbind(assualt_KDE_sf, assualt_risk_sf) %>%
+  na.omit() %>%
+  gather(Variable, Value, -label, -Risk_Category, -geometry) %>%
+  ggplot() +
+  geom_sf(aes(fill = Risk_Category), colour = NA) +
+  geom_sf(data = sample_n(assualt18, 3000), size = .5, colour = "black") +
+  facet_wrap(~label, ) +
+  scale_fill_viridis(discrete = TRUE) +
+  labs(title="Comparison of Kernel Density and Risk Predictions",
+       subtitle="2017 assualt risk predictions; 2018 assualts") +
+  mapTheme()
+
+rbind(assualt_KDE_sf, assualt_risk_sf) %>%
+  st_set_geometry(NULL) %>% na.omit() %>%
+  gather(Variable, Value, -label, -Risk_Category) %>%
+  group_by(label, Risk_Category) %>%
+  summarize(countAssualt = sum(Value)) %>%
+  ungroup() %>%
+  group_by(label) %>%
+  mutate(Rate_of_test_set_crimes = countAssualt / sum(countAssualt)) %>%
+  ggplot(aes(Risk_Category,Rate_of_test_set_crimes)) +
+  geom_bar(aes(fill=label), position="dodge", stat="identity") +
+  scale_fill_viridis(discrete = TRUE) +
+  labs(title = "Risk prediction vs. Kernel density, 2018 assualts") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
 
