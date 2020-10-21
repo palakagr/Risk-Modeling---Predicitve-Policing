@@ -1,0 +1,61 @@
+---
+title: "MUSA508_Assignment3_Palak"
+author: "Palak Agarwal"
+date: "October 23th, 2020"
+output:
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_float: true
+    toc_depth: 3
+---
+# Introduction 
+
+Zillow publishes "Zestimate" valuations for homes across the U.S. using an algorithm that draws on data from county and tax assessor records, multiple listing services, brokerages, and homeowner submissions. This project sought to improve Zillow's housing market predictions for Miami and Miami Beach.
+
+This endeavor was challenging for several reasons. First, we relied exlusively on ordinary least squares linear modeling. A more sophisted algorithm, such as random forest, may produce a better model. Second, the project used only open source data. This restriction was particularly challenging given the lack of open source data available for Miami Beach as compared to Miami.
+
+We conceptualized our model using the hedonic model, which predicts home prices by summing the value of its constituent parts. Our model includes three types of variables: internal characteristics of houses, amenities/public services, and spatial structures. 
+
+Despite our hardwork and dedication to the project, we failed to create a successful model. With a mean absolute error of over $350,000 in our model, we do not anticipate securing a contract with Zillow anytime soon. 
+
+### Set Up
+
+The features in this model were engineered using the functions: **Nearest neighbor.** The nearest neighbor function finds the average distance from the measuring feature to the measured feature. The function requires 3 input variables - the dependent feature to measure from, the features to measure to, and the number of features. For example, a nearest neighbor feature could measure the average distance from each house to its three closest public parks. 
+```{r setup, message = FALSE, warning=FALSE,results=FALSE}
+#importing the library
+library(tidyverse)
+library(sf)
+library(viridis)
+library(spatstat)
+library(RSocrata)
+library(raster)
+library(spdep)
+library(FNN)
+library(grid)
+library(gridExtra)
+library(knitr)
+library(kableExtra)
+library(tidycensus)
+library(mapview)
+library(osmdata)
+library(fastDummies)
+# functions
+root.dir = "https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/DATA/"
+source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
+```
+
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
