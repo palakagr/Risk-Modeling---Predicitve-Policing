@@ -215,7 +215,7 @@ parks <-
 
 Liquor <-
   st_read("C:/Users/agarw/Documents/MUSA508/MUSA508-Assignment3/Data/Registered_Business_Locations_-_San_Francisco.csv") %>% 
-  filter(str_detect(Liquor$DBA.Name, "Liquor")) %>%
+  filter(str_detect(DBA.Name, "Liquor")) %>%
   mutate(g = str_remove_all(Business.Location, "[POINT()]")) %>%
   separate(., col = g,into = c("g","X","Y"), sep = " ")%>% 
   dplyr::select(Y, X) %>%
