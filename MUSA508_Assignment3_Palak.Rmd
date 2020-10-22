@@ -1,5 +1,5 @@
 ---
-title: "MUSA508_Assignment3_Palak"
+title: "Risk Modeling - Predicitve Policing"
 author: "Palak Agarwal"
 date: "October 23th, 2020"
 output:
@@ -11,9 +11,9 @@ output:
 ---
 # Introduction 
 
-Policing has driven public-sector machine learning because law enforcement has significant planning and resource allocation questions. In this assignment, we look at the intersection of public sector planning and data science to ensure that the supply of a limited resource matches the demand for those resources. There are many traditional methods that exist but  have not been as effective.     
+One of the main aims of policing making is to make smart and efficient decisions in terms of resource and capital allocation which benefits large populations. It is always a comparison between initial investment to long trend usage and benefits. Policing has driven public-sector machine learning because law enforcement has significant planning and resource allocation questions. In this assignment, we look at the intersection of public sector planning and data science to ensure that the supply of a limited resource matches the demand for those resources. There are many traditional methods that exist but none have been proven effective.     
              
-We look at crime risk predictions for this assignment. Given the current political and social scenario, we know that current policing and resource planning is a result of systematic racism, racial discrimination and biased judgments. The most important result and outcome out of this prediction should be that it does not emphasize the same biases that is evident.   
+In this assignment I looked at risk predictions for assaults. Given the current political and social scenario, we know that current policing and resource planning is a result of systematic racism, racial discrimination, and biased judgments. The most important result and outcome out of this prediction should be that it does not emphasize the same biases that are evident.   
       
 While we use a crime type and factors that affect it, one needs to be aware of the reporting bias that exists and not every crime location gets reported. 
 
@@ -48,7 +48,7 @@ source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-L
 
 The crime that I have picked to look at is Assaults in San Francisco. By definition - it is the act to make a physical attack on. Here I have read in the assaults from 2017, San Francisco boundary and police districts. After that we create a fishnet over SF which will be used as the grid. I chose a grid 300 by 300 to account for finer resolution in the hotspots.    
      
-From Figures 1.1 and 1.2 you can see that the assault reports are clustered in the financial district which is the heart of SF. The area has a large foot fall and is very dense, hence the number of reports in the area is high and that can be a result of reporting bias. 
+From Figures 1.1 and 1.2 you can see that the assault reports are clustered in the financial district which is the heart of SF. The area has a large foot fall and is very dense, hence the number of reports in the area is high and could be a result of reporting bias. The result is not surprising because downtown areas have higher population density and denser built environment which typically have higher rates of crime.
 ```{r load_data, message=FALSE, warning=FALSE, results=FALSE, cache=TRUE}
 ## Read in Data from SF
 sfCounty <-
@@ -130,9 +130,9 @@ ggplot() +
 
 ## Modeling risk factors
 
-Next, we move on to modeling the risk factors that are the independent variables. I used the following variables : **Encampments**, **Street lights out**, **Graffiti**, **Noise Reports**, **Abandoned Cars**, **Bars**, **Parks** and **Liquor stores.** The first five variables were taken from 311 calls and need they too might have a reporting bias that one needs to aware of. Also, some variable marginalize and make assumptions connecting to one or more communities which adds to the racial and systematic bias.    
+Next, we move on to modeling the risk factors that are the independent variables. I used the following variables : **Encampments**, **Street lights out**, **Graffiti**, **Noise Reports**, **Abandoned Cars**, **Bars**, **Parks** and **Liquor stores.** The first five variables were taken from 311 calls and they likely have a reporting bias that one needs to aware of. Also, some variables marginalize and make assumptions connecting to one or more communities which add to the racial and systematic bias.    
        
-The other variables I looked at but didnt add to the final model are **Homeless calls**, **Drug crimes** and **Domestic violence crimes.** The reason for not using the homeless data was to avoid the unnecessary connection. As you can see from Figures 3.1 and 3.2 the location of drug and domestic violence crimes are clustered in the same location as that of assault crimes and that would have made the model give them an over emphasizes than the other variables. 
+The other variables I looked at but didn't add to the final model are **Homeless calls**, **Drug crimes** and **Domestic violence crimes.** The reason for not using the homeless data was to avoid the unnecessary connection. As you can see from Figures 3.1 and 3.2 the location of drug and domestic violence crimes are clustered in the same location as that of assault crimes and that would have made the model overemphasize them over the other variables. 
 ```{r risk_factors, message = FALSE, warning=FALSE, results = FALSE, cache=TRUE}
 ## Modeling Spatial Features
 
@@ -505,7 +505,8 @@ ggplot() +
 ## Correlation
 
 Correlation gives important context while also providing intuition on features that may predict the count of assaults.
-```{r correlation, message = FALSE, warning=FALSE}
+```{r correlation, message = FALSE, warning=FALSE, fig.width= 8, fig.height=10}
+
 ## Correlation
 
 correlation.long <-
@@ -875,4 +876,6 @@ rbind(assualt_KDE_sf, assualt_risk_sf) %>%
 
 ## Conclusion
 
-We have seen that the model does well generalizing and predicting across different scales but we cannot be sure the model doesn't suffer from selection bias. As discussed in the introduction the data we using has a reporting bias and this goes unaccounted for in the model. But it does well predicting for 2018, hence its fair to say that the cost and resource allocation benefit is high enough to make this a better modeling strategy over the traditional kernel density method. Finally, while these models may not be appropriate for crime prediction, there are a host of other planning outcomes that could benefit greatly.
+We have seen that the model does well generalizing and predicting across different scales but we cannot be sure the model doesn't suffer from selection bias. As discussed in the introduction the data used has a reporting bias due to the self-reported nature of the data, which goes unaccounted for in the model.It is impossible to account for racial biases in existing resource allocation, creating a potential feedback loop for this kind of bias. While this models may not be completely appropriate for crime prediction, there are a host of other planning outcomes that could benefit greatly. The model does best with what data it is fed, so the issue is with the data itself over the model elements. 
+
+However, the predicted results match well with the reported data for 2018, hence it is fair to say that the benefits in cost reduction and resource allocation are high enough to make this a better modeling strategy over the traditional kernel density method. The model can be made smarter with the introduction of other variables and spatial processes, which can work towards reducing biases. If the model is implemented, future datasets become much smarter, leading to greater accuracy and generalizability in future predictions. 
