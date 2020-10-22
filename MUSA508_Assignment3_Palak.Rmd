@@ -46,8 +46,10 @@ source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-L
 ## Data Wrangling
 ### Loading data and creating fishnet
 
-The crime that I have picked to look at is Assaults in San Francisco. By definition - it is the act to make a physical attack on. Here I have read in the assaults from 2017, San Francisco boundary and police districts. After that we create a fishnet over SF which will be used as the grid. I chose a grid 300 by 300 to account for finer resolution in the hotspots. 
-```{r load_data, message = FALSE, warning=FALSE, results=FALSE, echo = FALSE}
+The crime that I have picked to look at is Assaults in San Francisco. By definition - it is the act to make a physical attack on. Here I have read in the assaults from 2017, San Francisco boundary and police districts. After that we create a fishnet over SF which will be used as the grid. I chose a grid 300 by 300 to account for finer resolution in the hotspots.    
+     
+From Figures 1.1 and 1.2 you can see that the assault reports are clustered in the financial district which is the heart of SF. The area has a large foot fall and is very dense, hence the number of reports in the area is high and that can be a result of reporting bias. 
+```{r load_data, message = FALSE, warning=FALSE, results=FALSE}
 ## Read in Data from SF
 sfCounty <-
   st_read("https://data.sfgov.org/api/geospatial/p5b7-5n3h?method=export&format=GeoJSON") %>% 
@@ -106,8 +108,8 @@ ggplot()+
 
 ### Joining assualts to the fishnet
 
-We aggregate the total number of assaults to each grid cell by using the coordinates of the assault and finding which cell it falls within.
-```{r load_data2, message = FALSE, warning=FALSE, echo = FALSE}
+We aggregate the total number of assaults to each grid cell by using the coordinates of the assault and finding which cell it falls within.            
+```{r load_data2, message = FALSE, warning=FALSE}
 ### Aggregate points to the fishnet
 ## add a value of 1 to each crime, sum them with aggregate
 crime_net <- 
@@ -131,7 +133,7 @@ ggplot() +
 Next, we move on to modeling the risk factors that are the independent variables. I used the following variables : **Encampments**, **Street lights out**, **Graffiti**, **Noise Reports**, **Abandoned Cars**, **Bars**, **Parks** and **Liquor stores.** The first five variables were taken from 311 calls and need they too might have a reporting bias that one needs to aware of. Also, some variable marginalize and make assumptions connecting to one or more communities which adds to the racial and systematic bias.    
        
 The other variables I looked at but didnt add to the final model are **Homeless calls**, **Drug crimes** and **Domestic violence crimes.** The reason for not using the homeless data was to avoid the unnecessary connection. As you can see from Figures 3.1 and 3.2 the location of drug and domestic violence crimes are clustered in the same location as that of assault crimes and that would have made the model give them an over emphasizes than the other variables. 
-```{r risk_factors, message = FALSE, warning=FALSE, echo = FALSE, results = FALSE}
+```{r risk_factors, message = FALSE, warning=FALSE, results = FALSE}
 ## Modeling Spatial Features
 
 Encampments <- 
@@ -237,7 +239,7 @@ neighborhoods <-
   dplyr::select(-link)
 ```
 
-```{r crime_other, message = FALSE, warning=FALSE, echo = FALSE }
+```{r crime_other, message = FALSE, warning=FALSE}
 drug <- 
   read.socrata("https://data.sfgov.org/resource/tmnf-yvry.json") %>% 
   filter(category == "DRUG/NARCOTIC" & date > as.POSIXct("2017-01-01") & date < as.POSIXct("2018-01-01") ) %>%  
@@ -286,13 +288,14 @@ ggplot() +
 plot(drug_net$countDrug, crime_net$countAssualt, main= "Correlation between Drug and Assualt")
 plot(domestic_net$countDom, crime_net$countAssualt, main= "Correlation between Domestic Violence and Assualt")
 ```
+               
 The above two scatter plots show that as the count of drug or domestic violence counts increase, so does the count of assaults. To avoid multicollinearity the variables were lefft out.      
      
 ## Feature engineering 
 ### Count of risk factors by grid cell
 
 Now we bind all the variables and add it to the fishnet created above to calculate the count within each grid cell. In Figure 4.1 you can see the counts of each risk factor.
-```{r feature_engg, message = FALSE, warning=FALSE, echo = FALSE}
+```{r feature_engg, message = FALSE, warning=FALSE}
 #### Aggregate a feature to our fishnet
 
 vars_net <- rbind(Encampments, Streetlights, Graffiti, NoiseReport, AbandonedCar, bars, parks, Liquor) %>%
@@ -328,7 +331,7 @@ do.call(grid.arrange,c(mapList, ncol =3, top = "Risk Factors by Fishnet", bottom
 ##  Nearest neighbor features
 
 The grid cell imposes a very rigid spatial pattern over the variables. To loosen that up a little, we use the nearest neighbor function to create spatial relation between the risk factors. I ran the model on different k values for the risk factors, and decided which model worked better than the other based on the MAE values. Hence, below you see different k values. Figure 5.1 shows the updated counts after the adding the spatial feature engineering.
-```{r feature_nn, message = FALSE, warning=FALSE, echo = FALSE}
+```{r feature_nn, message = FALSE, warning=FALSE}
 ## Nearest neighbor
 nn_function <- function(measureFrom,measureTo,k) {
   measureFrom_Matrix <-
@@ -409,7 +412,7 @@ do.call(grid.arrange,c(mapList, ncol = 3, top = "Nearest Neighbor risk Factors b
 ## Measure distance to main spot in SF
 
 Sf's hotspot is the financial district and the distance of each grid cell to that has been added to the model.
-```{r feature_dist, message = FALSE, warning=FALSE, echo = FALSE}
+```{r feature_dist, message = FALSE, warning=FALSE}
 ## Hotspot
 Financial_District <-
   filter(neighborhoods, name == "Financial District") %>%
@@ -427,7 +430,7 @@ ggplot() +
 ```
 
 ### Create the final_net
-```{r final_net, message = FALSE, warning=FALSE, echo = FALSE}
+```{r final_net, message = FALSE, warning=FALSE}
 final_net <-
   left_join(crime_net, st_drop_geometry(vars_net), by="uniqueID") 
 
@@ -444,7 +447,7 @@ final_net <-
 ## Local Moran's I
 
 'Global' Moran's I is used to test for spatial autocorrelation at larger neighborhood scales. This information provided insight into the spatial process accounting for neighborhood scale clustering, but not clustering at more local scales. Hence, that local spatial process is explored using Local Moran's I. Here, the null hypothesis is that the assault count at a given location is randomly distributed relative to its immediate neighbors. The tests results have been visualised in Figure 7.1.
-```{r Local_Moran, message = FALSE, warning=FALSE, echo = FALSE}
+```{r Local_Moran, message = FALSE, warning=FALSE}
 ## Local Moran I's
 final_net.nb <- poly2nb(as_Spatial(final_net), queen=TRUE)
 final_net.weights <- nb2listw(final_net.nb, style="W", zero.policy=TRUE)
@@ -481,7 +484,7 @@ do.call(grid.arrange,c(varList, ncol = 4, top = "Local Morans I statistics, Assu
 ## Highly significant hotspots
 
 Using areas with p values less than 0.0000001 to identify significant spots. After that the distance of each grid cell is calculated to its nearest significant spot.
-```{r hotspots, message = FALSE, warning=FALSE, echo = FALSE}
+```{r hotspots, message = FALSE, warning=FALSE}
 final_net <-
   final_net %>% 
   mutate(Assualt.isSig = 
@@ -502,7 +505,7 @@ ggplot() +
 ## Correlation
 
 Correlation gives important context while also providing intuition on features that may predict the count of assaults.
-```{r correlation, message = FALSE, warning=FALSE, echo = FALSE}
+```{r correlation, message = FALSE, warning=FALSE}
 ## Correlation
 
 correlation.long <-
@@ -531,7 +534,7 @@ ggplot(correlation.long, aes(Value, countAssualt)) +
 While predicting crime the model should be good at predicting the crime risk 'experience' at both citywide and local spatial scales. The best way to test for this is to hold out one local area, train the model on the remaining n - 1 areas, predict for the hold out, and record the goodness of fit. In this form of spatial cross-validation called 'Leave-one-group-out' cross-validation (LOGO-CV), each neighborhood takes a turn as a hold-out.   
      
 Also two different lists of variables were created, one has **Just risk factors** and the other is includes the risk facotrs with the Local Moran's I **Spatial Process**. Figure 10.1 and 10.2 show the predicted count of assaults and the observed counts. The model does a pretty good job with the predictions.
-```{r regression, message = FALSE, warning=FALSE, echo = FALSE, results = FALSE}
+```{r regression, message = FALSE, warning=FALSE, results = FALSE}
 reg.vars <- c("Encampments.nn", "Abandoned_Cars.nn", "Graffiti.nn", 
               "Bars.nn", "Streetlights.nn", "NoiseReport.nn", "Parks.nn",
               "loopDistance")
@@ -614,7 +617,7 @@ reg.summary <-
   st_sf() 
 ```
 
-```{r vis, message = FALSE, warning=FALSE, echo = FALSE}
+```{r vis, message = FALSE, warning=FALSE}
 ## Predicted assualts
 reg.summary %>%
   filter(str_detect(Regression, "k-fold")) %>%
@@ -638,7 +641,7 @@ reg.summary %>%
 ## Accuracy & Generalzability
 
 All the figures and tables below shows that adding spatial processes to the model, helps remove the large errors in the model and the mean MAE. 
-```{r accuracy, message = FALSE, warning=FALSE, echo = FALSE}
+```{r accuracy, message = FALSE, warning=FALSE}
 error_by_reg_and_fold <- 
   reg.summary %>%
   group_by(Regression, cvID) %>% 
@@ -679,7 +682,7 @@ error_by_reg_and_fold %>%
 ### Local Spatial process
 
 Initially the Local Moran's I was calculated on queen neighbors, here we test it on neighborhood scale. We can see from Table 2.1 we can see that the model performs well at the neighborhood scale as well.
-```{r local_spatial, message = FALSE, warning=FALSE, echo = FALSE}
+```{r local_spatial, message = FALSE, warning=FALSE}
 neighborhood.weights <-
   filter(error_by_reg_and_fold, Regression == "Spatial LOGO-CV: Spatial Process") %>%
   group_by(cvID) %>%
@@ -705,7 +708,7 @@ filter(error_by_reg_and_fold, str_detect(Regression, "LOGO"))  %>%
 ### Generalizability by neighborhood
 
 From Figure 12.1 you can see that the model over predicts in low assault areas and under predicts in high assaults areas. This is not the most ideal scenario, and indicates more risk factors might need to be added to the model.
-```{r gene_neigh, message = FALSE, warning=FALSE, echo = FALSE}
+```{r gene_neigh, message = FALSE, warning=FALSE}
 st_drop_geometry(reg.summary) %>%
   group_by(Regression) %>%
   mutate(Assualt_Decile = ntile(countAssualt, 10)) %>%
@@ -723,7 +726,7 @@ st_drop_geometry(reg.summary) %>%
 ### Generalizability by race
 
 As mentioned before, current resource allocation is a result of systematic racism and hence the risk prediction model should be able to over come that bias. As its visible from table 3.1 the model under predicts in Major Non-white areas and over predicts in White areas which is the ideal result we hope to see.
-```{r census, message = FALSE, warning=FALSE, echo = FALSE, results= FALSE}
+```{r census, message = FALSE, warning=FALSE, results= FALSE}
 ## Generalization by race
 tracts18 <- 
   get_acs(geography = "tract", variables = c("B01001_001E","B01001A_001E"), 
@@ -738,7 +741,7 @@ tracts18 <-
   .[neighborhoods,]
 ```
 
-```{r race, message = FALSE, warning=FALSE, echo = FALSE}
+```{r race, message = FALSE, warning=FALSE}
 ggplot()+
   geom_sf(data = tracts18, aes(fill = raceContext)) +
   scale_fill_manual(values = c("#25CB10", "#FA7800"), name="Race Context") +
@@ -754,7 +757,7 @@ reg.summary %>%
   group_by(Regression, raceContext) %>%
   summarize(mean.Error = mean(Error, na.rm = T)) %>%
   spread(raceContext, mean.Error) %>%
-  kable(caption = "Mean Error by neighborhood racial context1") %>%
+  kable(caption = "Mean Error by neighborhood racial context") %>%
   kable_styling("striped", full_width = F) %>%
   footnote(general_title = "\n",
            general = "Table 3.1")
@@ -763,7 +766,7 @@ reg.summary %>%
 ## Kernal Density vs Risk Prediction
 
 Traditionally, the police allocates its resources using kernel. density models which smooths out the hotspots into a continuous surface which is visualized in Figure 14.1. You can see the drawbacks of this model in Figure 14.2 in which the kernel density is overlaid with the sample from the assaults.
-```{r kernal, message = FALSE, warning=FALSE, echo = FALSE}
+```{r kernal, message = FALSE, warning=FALSE}
 assualt_ppp <- as.ppp(st_coordinates(assualt), W = st_bbox(final_net))
 assualt_KD.1000 <- spatstat::density.ppp(assualt_ppp, 1000)
 assualt_KD.1500 <- spatstat::density.ppp(assualt_ppp, 1500)
@@ -797,7 +800,7 @@ as.data.frame(assualt_KD.1000) %>%
 ## Goodness for fit
 
 To test the model for goodness for fit, we run the model on 2018 assaults and see that the model does a better job predicting the locations.
-```{r pred_2018, message = FALSE, warning=FALSE, echo = FALSE}
+```{r pred_2018, message = FALSE, warning=FALSE}
 assualt18 <- 
   read.socrata("https://data.sfgov.org/resource/tmnf-yvry.json") %>% 
   filter(category == "ASSAULT" & date > as.POSIXct("2018-01-01") & date < as.POSIXct("2019-01-01") ) %>%  
