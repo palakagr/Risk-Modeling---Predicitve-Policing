@@ -49,7 +49,7 @@ source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-L
 The crime that I have picked to look at is Assaults in San Francisco. By definition - it is the act to make a physical attack on. Here I have read in the assaults from 2017, San Francisco boundary and police districts. After that we create a fishnet over SF which will be used as the grid. I chose a grid 300 by 300 to account for finer resolution in the hotspots.    
      
 From Figures 1.1 and 1.2 you can see that the assault reports are clustered in the financial district which is the heart of SF. The area has a large foot fall and is very dense, hence the number of reports in the area is high and that can be a result of reporting bias. 
-```{r load_data, message = FALSE, warning=FALSE, results=FALSE}
+```{r load_data, message=FALSE, warning=FALSE, results=FALSE, cache=TRUE}
 ## Read in Data from SF
 sfCounty <-
   st_read("https://data.sfgov.org/api/geospatial/p5b7-5n3h?method=export&format=GeoJSON") %>% 
@@ -133,7 +133,7 @@ ggplot() +
 Next, we move on to modeling the risk factors that are the independent variables. I used the following variables : **Encampments**, **Street lights out**, **Graffiti**, **Noise Reports**, **Abandoned Cars**, **Bars**, **Parks** and **Liquor stores.** The first five variables were taken from 311 calls and need they too might have a reporting bias that one needs to aware of. Also, some variable marginalize and make assumptions connecting to one or more communities which adds to the racial and systematic bias.    
        
 The other variables I looked at but didnt add to the final model are **Homeless calls**, **Drug crimes** and **Domestic violence crimes.** The reason for not using the homeless data was to avoid the unnecessary connection. As you can see from Figures 3.1 and 3.2 the location of drug and domestic violence crimes are clustered in the same location as that of assault crimes and that would have made the model give them an over emphasizes than the other variables. 
-```{r risk_factors, message = FALSE, warning=FALSE, results = FALSE}
+```{r risk_factors, message = FALSE, warning=FALSE, results = FALSE, cache=TRUE}
 ## Modeling Spatial Features
 
 Encampments <- 
@@ -239,7 +239,7 @@ neighborhoods <-
   dplyr::select(-link)
 ```
 
-```{r crime_other, message = FALSE, warning=FALSE}
+```{r crime_other, message = FALSE, warning=FALSE, cache=TRUE}
 drug <- 
   read.socrata("https://data.sfgov.org/resource/tmnf-yvry.json") %>% 
   filter(category == "DRUG/NARCOTIC" & date > as.POSIXct("2017-01-01") & date < as.POSIXct("2018-01-01") ) %>%  
@@ -726,7 +726,7 @@ st_drop_geometry(reg.summary) %>%
 ### Generalizability by race
 
 As mentioned before, current resource allocation is a result of systematic racism and hence the risk prediction model should be able to over come that bias. As its visible from table 3.1 the model under predicts in Major Non-white areas and over predicts in White areas which is the ideal result we hope to see.
-```{r census, message = FALSE, warning=FALSE, results= FALSE}
+```{r census, message = FALSE, warning=FALSE, results= FALSE, cache=TRUE}
 ## Generalization by race
 tracts18 <- 
   get_acs(geography = "tract", variables = c("B01001_001E","B01001A_001E"), 
@@ -800,7 +800,7 @@ as.data.frame(assualt_KD.1000) %>%
 ## Goodness for fit
 
 To test the model for goodness for fit, we run the model on 2018 assaults and see that the model does a better job predicting the locations.
-```{r pred_2018, message = FALSE, warning=FALSE}
+```{r pred_2018, message = FALSE, warning=FALSE, cache=TRUE}
 assualt18 <- 
   read.socrata("https://data.sfgov.org/resource/tmnf-yvry.json") %>% 
   filter(category == "ASSAULT" & date > as.POSIXct("2018-01-01") & date < as.POSIXct("2019-01-01") ) %>%  
