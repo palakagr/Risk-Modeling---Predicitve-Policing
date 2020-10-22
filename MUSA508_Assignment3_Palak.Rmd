@@ -74,7 +74,7 @@ assualt <-
 grid.arrange(ncol=2,
              ggplot() + 
                geom_sf(data = sfCounty) +
-               geom_sf(data = assualt, colour="red", size=0.1, show.legend = "point") +
+               geom_sf(data = assualt, colour="red", size=0.5, show.legend = "point") +
                labs(title= "Assualts, San Francisco - 2017", caption = "Figure 1.2") +
                mapTheme(title_size = 14),
              
@@ -85,7 +85,7 @@ grid.arrange(ncol=2,
                               size = 0.01, bins = 40, geom = 'polygon') +
                scale_fill_viridis() +
                scale_alpha(range = c(0.00, 0.35), guide = FALSE) +
-               labs(title = "Density of Assualts") +
+               labs(title = "Density of Assualts", caption = " ") +
                mapTheme(title_size = 14) + theme(legend.position = "none"))
 
 ## Creating a fishnet grid
@@ -122,7 +122,7 @@ crime_net <-
 ggplot() +
   geom_sf(data = crime_net, aes(fill = countAssualt), color = NA) +
   scale_fill_viridis() +
-  labs(title = "Count of Assualts for the fishnet", subtitle = "Figure 2.1") +
+  labs(title = "Count of Assualts for the fishnet", caption = "Figure 2.1") +
   mapTheme()
 ```
 
@@ -131,7 +131,7 @@ ggplot() +
 Next, we move on to modeling the risk factors that are the independent variables. I used the following variables : **Encampments**, **Street lights out**, **Graffiti**, **Noise Reports**, **Abandoned Cars**, **Bars**, **Parks** and **Liquor stores.** The first five variables were taken from 311 calls and need they too might have a reporting bias that one needs to aware of. Also, some variable marginalize and make assumptions connecting to one or more communities which adds to the racial and systematic bias.    
        
 The other variables I looked at but didnt add to the final model are **Homeless calls**, **Drug crimes** and **Domestic violence crimes.** The reason for not using the homeless data was to avoid the unnecessary connection. As you can see from Figures 3.1 and 3.2 the location of drug and domestic violence crimes are clustered in the same location as that of assault crimes and that would have made the model give them an over emphasizes than the other variables. 
-```{r risk_factors, message = FALSE, warning=FALSE, echo = FALSE}
+```{r risk_factors, message = FALSE, warning=FALSE, echo = FALSE, results = FALSE}
 ## Modeling Spatial Features
 
 Encampments <- 
@@ -235,7 +235,9 @@ neighborhoods <-
   st_read("https://data.sfgov.org/api/geospatial/pty2-tcw4?method=export&format=GeoJSON") %>%
   st_transform(st_crs(fishnet)) %>%
   dplyr::select(-link)
+```
 
+```{r crime_other, message = FALSE, warning=FALSE, echo = FALSE }
 drug <- 
   read.socrata("https://data.sfgov.org/resource/tmnf-yvry.json") %>% 
   filter(category == "DRUG/NARCOTIC" & date > as.POSIXct("2017-01-01") & date < as.POSIXct("2018-01-01") ) %>%  
@@ -284,7 +286,7 @@ ggplot() +
 plot(drug_net$countDrug, crime_net$countAssualt, main= "Correlation between Drug and Assualt")
 plot(domestic_net$countDom, crime_net$countAssualt, main= "Correlation between Domestic Violence and Assualt")
 ```
-The above two scatter plots show that as the count of drug or domestiv violence counts increase, so does the count of assaults. To avoid multicollinearity the variables were lefft out.      
+The above two scatter plots show that as the count of drug or domestic violence counts increase, so does the count of assaults. To avoid multicollinearity the variables were lefft out.      
      
 ## Feature engineering 
 ### Count of risk factors by grid cell
@@ -349,7 +351,7 @@ nn_function <- function(measureFrom,measureTo,k) {
   return(output)  
 }
 
-# convinience to reduce length of function names.
+# convenience to reduce length of function names.
 st_c<- st_coordinates
 st_coid <- st_centroid
 
@@ -401,7 +403,7 @@ for(i in vars){
     labs(title=i) +
     mapTheme()}
 
-do.call(grid.arrange,c(mapList, ncol = 3, top = "Nearest Neighbor risk Factors by Fishnet", bottom = "Figure 5.1"))
+do.call(grid.arrange,c(mapList, ncol = 3, top = "Nearest Neighbor risk Factors by Fishnet", bottom = " \n Figure 5.1"))
 ```
 
 ## Measure distance to main spot in SF
@@ -420,7 +422,7 @@ vars_net$loopDistance =
 ggplot() + 
   geom_sf(data=vars_net, aes(fill=loopDistance), colour=NA) + 
   scale_fill_viridis() +
-  labs(title = "Distance to the Hotspot", subtitle = "Figure 6.1") +
+  labs(title = "Distance to the Hotspot", caption = "Figure 6.1") +
   mapTheme()
 ```
 
@@ -441,7 +443,7 @@ final_net <-
 
 ## Local Moran's I
 
-'Global' Moran's I is used to test for spatial autocorrelation at larger neighborhood scales. This information provided insight into the spatial process accounting for neighborhood scale clustering, but not clustering at more local scales. Hence, that local spatial process is explored using Local Moran's I. Here, the null hypothesis is that the assault count at a given location is randomly distributed relative to its immediate neighbors.
+'Global' Moran's I is used to test for spatial autocorrelation at larger neighborhood scales. This information provided insight into the spatial process accounting for neighborhood scale clustering, but not clustering at more local scales. Hence, that local spatial process is explored using Local Moran's I. Here, the null hypothesis is that the assault count at a given location is randomly distributed relative to its immediate neighbors. The tests results have been visualised in Figure 7.1.
 ```{r Local_Moran, message = FALSE, warning=FALSE, echo = FALSE}
 ## Local Moran I's
 final_net.nb <- poly2nb(as_Spatial(final_net), queen=TRUE)
@@ -473,10 +475,12 @@ for(i in vars){
     labs(title=i) +
     mapTheme() + theme(legend.position="bottom")}
 
-do.call(grid.arrange,c(varList, ncol = 4, top = "Local Morans I statistics, Assualt"))
+do.call(grid.arrange,c(varList, ncol = 4, top = "Local Morans I statistics, Assualt", bottom = "Figure 7.1"))
 ```
 
 ## Highly significant hotspots
+
+Using areas with p values less than 0.0000001 to identify significant spots. After that the distance of each grid cell is calculated to its nearest significant spot.
 ```{r hotspots, message = FALSE, warning=FALSE, echo = FALSE}
 final_net <-
   final_net %>% 
@@ -491,11 +495,13 @@ final_net <-
 ggplot() +
   geom_sf(data = final_net, aes(fill=Assualt.isSig.dist), colour=NA) +
   scale_fill_viridis(name="NN Distance") +
-  labs(title="Assualt NN Distance", caption = "Figure 7.1") +
+  labs(title="Assualt NN Distance", caption = "Figure 8.1") +
   mapTheme()
 ```
 
 ## Correlation
+
+Correlation gives important context while also providing intuition on features that may predict the count of assaults.
 ```{r correlation, message = FALSE, warning=FALSE, echo = FALSE}
 ## Correlation
 
@@ -515,13 +521,17 @@ ggplot(correlation.long, aes(Value, countAssualt)) +
             x=-Inf, y=Inf, vjust = 1.5, hjust = -.1) +
   geom_smooth(method = "lm", se = FALSE, colour = "black") +
   facet_wrap(~Variable, ncol = 2, scales = "free") +
-  labs(title = "Assualt count as a function of risk factors", caption = "Figure 8.1") +
+  labs(title = "Assualt count as a function of risk factors", caption = "Figure 9.1") +
   plotTheme()
 ```
 
 ## Poisson Regression
 ### Cross validation
-```{r regression, message = FALSE, warning=FALSE, echo = FALSE}
+
+While predicting crime the model should be good at predicting the crime risk 'experience' at both citywide and local spatial scales. The best way to test for this is to hold out one local area, train the model on the remaining n - 1 areas, predict for the hold out, and record the goodness of fit. In this form of spatial cross-validation called 'Leave-one-group-out' cross-validation (LOGO-CV), each neighborhood takes a turn as a hold-out.   
+     
+Also two different lists of variables were created, one has **Just risk factors** and the other is includes the risk facotrs with the Local Moran's I **Spatial Process**. Figure 10.1 and 10.2 show the predicted count of assaults and the observed counts. The model does a pretty good job with the predictions.
+```{r regression, message = FALSE, warning=FALSE, echo = FALSE, results = FALSE}
 reg.vars <- c("Encampments.nn", "Abandoned_Cars.nn", "Graffiti.nn", 
               "Bars.nn", "Streetlights.nn", "NoiseReport.nn", "Parks.nn",
               "loopDistance")
@@ -602,7 +612,9 @@ reg.summary <-
     mutate(reg.ss.spatialCV, Error = Prediction - countAssualt,
            Regression = "Spatial LOGO-CV: Spatial Process")) %>%
   st_sf() 
+```
 
+```{r vis, message = FALSE, warning=FALSE, echo = FALSE}
 ## Predicted assualts
 reg.summary %>%
   filter(str_detect(Regression, "k-fold")) %>%
@@ -610,7 +622,7 @@ reg.summary %>%
   geom_sf(aes(fill = Prediction)) +
   facet_wrap(~Regression) +
   scale_fill_viridis() +
-  labs(title = "Prediction assualts by Regression", subtitle = "Figure 9.1") +
+  labs(title = "Prediction assualts by Regression", caption = "Figure 10.1") +
   mapTheme() + theme(legend.position="bottom")
 
 ##Oberserved Assualts
@@ -619,11 +631,13 @@ reg.summary %>%
   ggplot() +
   geom_sf(aes(fill = countAssualt)) +
   scale_fill_viridis() +
-  labs(title = "Observed count of Assualts", subtitle = "Figure 9.2") +
+  labs(title = "Observed count of Assualts", caption = "Figure 10.2") +
   mapTheme()+ theme(legend.position="bottom")
 ```
 
 ## Accuracy & Generalzability
+
+All the figures and tables below shows that adding spatial processes to the model, helps remove the large errors in the model and the mean MAE. 
 ```{r accuracy, message = FALSE, warning=FALSE, echo = FALSE}
 error_by_reg_and_fold <- 
   reg.summary %>%
@@ -638,15 +652,17 @@ error_by_reg_and_fold %>%
   geom_histogram(bins = 30, colour="black", fill = "#FDE725FF") +
   facet_wrap(~Regression) +  
   geom_vline(xintercept = 0) + scale_x_continuous(breaks = seq(0, 8, by = 1)) + 
-  labs(title="Distribution of MAE", subtitle = "k-fold cross validation vs. LOGO-CV \n Figure 10.1",
+  labs(title="Distribution of MAE", subtitle = "k-fold cross validation vs. LOGO-CV", caption ="Figure 11.1",
        x="Mean Absolute Error", y="Count") 
 
 st_drop_geometry(error_by_reg_and_fold) %>%
   group_by(Regression) %>% 
   summarize(Mean_MAE = round(mean(MAE), 2),
             SD_MAE = round(sd(MAE), 2)) %>%
-  kable(caption = "MAE by regression \n Table 1.1") %>%
+  kable(caption = "MAE by regression") %>%
   kable_styling("striped", full_width = F) %>%
+  footnote(general_title = "\n",
+           general = "Table 1.1")%>%
   row_spec(2, color = "black", background = "#FDE725FF") %>%
   row_spec(4, color = "black", background = "#FDE725FF") 
 
@@ -656,11 +672,13 @@ error_by_reg_and_fold %>%
   geom_sf(aes(fill = MAE)) +
   facet_wrap(~Regression) +
   scale_fill_viridis() +
-  labs(title = "Assualt errors by LOGO-CV Regression", subtitle = "Figure 10.2") +
+  labs(title = "Assualt errors by LOGO-CV Regression", caption = "Figure 11.2") +
   mapTheme() + theme(legend.position="bottom")
 ```
 
 ### Local Spatial process
+
+Initially the Local Moran's I was calculated on queen neighbors, here we test it on neighborhood scale. We can see from Table 2.1 we can see that the model performs well at the neighborhood scale as well.
 ```{r local_spatial, message = FALSE, warning=FALSE, echo = FALSE}
 neighborhood.weights <-
   filter(error_by_reg_and_fold, Regression == "Spatial LOGO-CV: Spatial Process") %>%
@@ -677,14 +695,16 @@ filter(error_by_reg_and_fold, str_detect(Regression, "LOGO"))  %>%
             p_value = moran.mc(abs(Mean_Error), neighborhood.weights, 
                                nsim = 999, zero.policy = TRUE, 
                                na.action=na.omit)[[3]]) %>%
-  kable(caption = "Moran's I on Errors by Regression \n Table 2.1") %>%
-  kable_styling("striped", full_width = F)%>%
-  row_spec(2, color = "black", background = "#FDE725FF")%>%
+  kable(caption = "Moran's I on Errors by Regression") %>%
   footnote(general_title = "\n",
-           general = "Table 2.3")
+           general = "Table 2.1")%>%
+  kable_styling("striped", full_width = F)%>%
+  row_spec(2, color = "black", background = "#FDE725FF")
 ```
 
 ### Generalizability by neighborhood
+
+From Figure 12.1 you can see that the model over predicts in low assault areas and under predicts in high assaults areas. This is not the most ideal scenario, and indicates more risk factors might need to be added to the model.
 ```{r gene_neigh, message = FALSE, warning=FALSE, echo = FALSE}
 st_drop_geometry(reg.summary) %>%
   group_by(Regression) %>%
@@ -697,11 +717,13 @@ st_drop_geometry(reg.summary) %>%
   geom_point(size = 2) + geom_path(aes(group = Assualt_Decile), colour = "black") +
   scale_shape_manual(values = c(2, 17)) +
   facet_wrap(~Regression) + xlim(0,10) +
-  labs(title = "Predicted and observed assualt by observed assualt decile", subtitle = "Figure 11.1")
+  labs(title = "Predicted and observed assualt by observed assualt decile", caption = "Figure 12.1")
 ```
 
 ### Generalizability by race
-```{r race, message = FALSE, warning=FALSE, echo = FALSE}
+
+As mentioned before, current resource allocation is a result of systematic racism and hence the risk prediction model should be able to over come that bias. As its visible from table 3.1 the model under predicts in Major Non-white areas and over predicts in White areas which is the ideal result we hope to see.
+```{r census, message = FALSE, warning=FALSE, echo = FALSE, results= FALSE}
 ## Generalization by race
 tracts18 <- 
   get_acs(geography = "tract", variables = c("B01001_001E","B01001A_001E"), 
@@ -714,11 +736,13 @@ tracts18 <-
   mutate(percentWhite = NumberWhites / TotalPop,
          raceContext = ifelse(percentWhite > .5, "Majority_White", "Majority_Non_White")) %>%
   .[neighborhoods,]
+```
 
+```{r race, message = FALSE, warning=FALSE, echo = FALSE}
 ggplot()+
   geom_sf(data = tracts18, aes(fill = raceContext)) +
   scale_fill_manual(values = c("#25CB10", "#FA7800"), name="Race Context") +
-  labs(title = "Income Context", subtitle = "Figure 12.1") +
+  labs(title = "Income Context", caption = "Figure 13.1") +
   mapTheme() + theme(legend.position="bottom")
 
 reg.summary %>% 
@@ -730,11 +754,15 @@ reg.summary %>%
   group_by(Regression, raceContext) %>%
   summarize(mean.Error = mean(Error, na.rm = T)) %>%
   spread(raceContext, mean.Error) %>%
-  kable(caption = "Mean Error by neighborhood racial context /n Table 3.1") %>%
-  kable_styling("striped", full_width = F) 
+  kable(caption = "Mean Error by neighborhood racial context1") %>%
+  kable_styling("striped", full_width = F) %>%
+  footnote(general_title = "\n",
+           general = "Table 3.1")
 ```
 
 ## Kernal Density vs Risk Prediction
+
+Traditionally, the police allocates its resources using kernel. density models which smooths out the hotspots into a continuous surface which is visualized in Figure 14.1. You can see the drawbacks of this model in Figure 14.2 in which the kernel density is overlaid with the sample from the assaults.
 ```{r kernal, message = FALSE, warning=FALSE, echo = FALSE}
 assualt_ppp <- as.ppp(st_coordinates(assualt), W = st_bbox(final_net))
 assualt_KD.1000 <- spatstat::density.ppp(assualt_ppp, 1000)
@@ -752,7 +780,7 @@ ggplot(data=assualt_KD.df, aes(x=x, y=y)) +
   facet_wrap(~Legend) +
   coord_sf(crs=st_crs(final_net)) + 
   scale_fill_viridis(name="Density") +
-  labs(title = "Kernel density with 3 different search radii", subtitle = "Figure 13.1") +
+  labs(title = "Kernel density with 3 different search radii", caption = "Figure 14.1") +
   mapTheme(title_size = 14)
 
 as.data.frame(assualt_KD.1000) %>%
@@ -762,11 +790,13 @@ as.data.frame(assualt_KD.1000) %>%
   geom_sf(aes(fill=value)) +
   geom_sf(data = sample_n(assualt, 1500), size = .5) +
   scale_fill_viridis(name = "Density") +
-  labs(title = "Kernel density of 2017 Assualt", subtitle = "Figure 13.2") +
+  labs(title = "Kernel density of 2017 Assualt", caption = "Figure 14.2") +
   mapTheme(title_size = 14)
 ```
 
 ## Goodness for fit
+
+To test the model for goodness for fit, we run the model on 2018 assaults and see that the model does a better job predicting the locations.
 ```{r pred_2018, message = FALSE, warning=FALSE, echo = FALSE}
 assualt18 <- 
   read.socrata("https://data.sfgov.org/resource/tmnf-yvry.json") %>% 
@@ -822,7 +852,7 @@ rbind(assualt_KDE_sf, assualt_risk_sf) %>%
   facet_wrap(~label, ) +
   scale_fill_viridis(discrete = TRUE) +
   labs(title="Comparison of Kernel Density and Risk Predictions",
-       subtitle="2017 assualt risk predictions; 2018 assualts /n Figure 14.1") +
+       subtitle="2017 assualt risk predictions; 2018 assualts", caption = "Figure 15.1") +
   mapTheme()
 
 rbind(assualt_KDE_sf, assualt_risk_sf) %>%
@@ -836,8 +866,10 @@ rbind(assualt_KDE_sf, assualt_risk_sf) %>%
   ggplot(aes(Risk_Category,Rate_of_test_set_crimes)) +
   geom_bar(aes(fill=label), position="dodge", stat="identity") +
   scale_fill_viridis(discrete = TRUE) +
-  labs(title = "Risk prediction vs. Kernel density, 2018 assualts", subtitle = "Figure 14.2") +
+  labs(title = "Risk prediction vs. Kernel density, 2018 assualts", caption = "Figure 15.2") +
   theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
 ```
 
 ## Conclusion
+
+We have seen that the model does well generalizing and predicting across different scales but we cannot be sure the model doesn't suffer from selection bias. As discussed in the introduction the data we using has a reporting bias and this goes unaccounted for in the model. But it does well predicting for 2018, hence its fair to say that the cost and resource allocation benefit is high enough to make this a better modeling strategy over the traditional kernel density method. Finally, while these models may not be appropriate for crime prediction, there are a host of other planning outcomes that could benefit greatly.
