@@ -29,6 +29,12 @@ policeDistricts_sf <-
   st_read("https://data.sfgov.org/api/geospatial/wkhw-cjsf?method=export&format=GeoJSON") %>% 
   st_transform('ESRI:102241')
 
+ggplot()+
+  geom_sf(data = policeDistricts_sf)+
+  labs(title="Police Districts") +
+  mapTheme()
+  
+
 assualt <- 
   read.socrata("https://data.sfgov.org/resource/tmnf-yvry.json") %>% 
   filter(category == "ASSAULT" & date > as.POSIXct("2017-01-01") & date < as.POSIXct("2018-01-01") ) %>%  
@@ -63,6 +69,11 @@ fishnet <-
   .[sfCounty] %>% 
   st_sf() %>%
   mutate(uniqueID = rownames(.))
+
+ggplot()+
+  geom_sf(data = fishnet)+
+  labs(title="Fishnet for SF") +
+  mapTheme()
 
 ### Aggregate points to the fishnet
 ## add a value of 1 to each crime, sum them with aggregate
@@ -204,7 +215,7 @@ ggplot() +
   geom_sf(data=sfbase, fill="black") +
   geom_sf(data=assualt, colour="red", size=.75)+
   geom_sf(data=drug, colour="blue", size=.75)+
-  labs(title="Assualt and Drug cases")
+  labs(title="Assualt and Drug cases", subtitle = "Assualts in red and Drug in Blue", caption = "Figure 3.1")
 
 DomesticViolence <- 
   read.socrata("https://data.sfgov.org/resource/tmnf-yvry.json") %>% 
@@ -225,15 +236,16 @@ domestic_net <-
 ggplot() +
   geom_sf(data=sfbase, fill="black") +
   geom_sf(data=assualt, colour="red", size=.75)+
-  geom_sf(data=DomesticViolence, colour="blue", size=.75)
+  geom_sf(data=DomesticViolence, colour="blue", size=.75)+
+  labs(title="Assualt and Domestic violence cases", subtitle = "Assualts in red and Domestic Violence in Blue", caption = "Figure 3.2")
 
 correlation_dom = cor(domestic_net$countDom, crime_net$countAssualt, use = "complete.obs")
 correlation_dom
 correlation_drug = cor(drug_net$countDrug, crime_net$countAssualt, use = "complete.obs")
 correlation_drug
 
-plot(drug_net$countDrug, crime_net$countAssualt)
-plot(domestic_net$countDom, crime_net$countAssualt)
+plot(drug_net$countDrug, crime_net$countAssualt, main= "Correlation between Drug and Assualt")
+plot(domestic_net$countDom, crime_net$countAssualt, main= "Correlation between Domestic Violence and Assualt")
 
 ## Neighborhoods to use in LOOCV in a bit
 neighborhoods <- 
@@ -528,6 +540,25 @@ reg.summary <-
            Regression = "Spatial LOGO-CV: Spatial Process")) %>%
   st_sf() 
 
+## Predicted assualts
+reg.summary %>%
+  filter(str_detect(Regression, "k-fold")) %>%
+  ggplot() +
+  geom_sf(aes(fill = Prediction)) +
+  facet_wrap(~Regression) +
+  scale_fill_viridis() +
+  labs(title = "Prediction assualts by Regression") +
+  mapTheme() + theme(legend.position="bottom")
+
+##Oberserved Assualts
+reg.summary %>%
+  filter(str_detect(Regression, "k-fold")) %>%
+  ggplot() +
+  geom_sf(aes(fill = countAssualt)) +
+  scale_fill_viridis() +
+  labs(title = "Observed count of Assualts") +
+  mapTheme()+ theme(legend.position="bottom")
+
 error_by_reg_and_fold <- 
   reg.summary %>%
   group_by(Regression, cvID) %>% 
@@ -576,8 +607,10 @@ filter(error_by_reg_and_fold, str_detect(Regression, "LOGO"))  %>%
                                 na.action=na.omit)[[1]],
             p_value = moran.mc(abs(Mean_Error), neighborhood.weights, 
                                nsim = 999, zero.policy = TRUE, 
-                               na.action=na.omit)[[3]])
-
+                               na.action=na.omit)[[3]]) %>%
+  kable(caption = "Moran's I on Errors by Regression") %>%
+  kable_styling("striped", full_width = F)%>%
+  row_spec(2, color = "black", background = "#FDE725FF") 
 
 st_drop_geometry(reg.summary) %>%
   group_by(Regression) %>%
@@ -592,6 +625,7 @@ st_drop_geometry(reg.summary) %>%
   facet_wrap(~Regression) + xlim(0,10) +
   labs(title = "Predicted and observed assualt by observed assualt decile")
 
+## Generalization by race
 tracts18 <- 
   get_acs(geography = "tract", variables = c("B01001_001E","B01001A_001E"), 
           year = 2018, state=06, county=075, geometry=T) %>%
@@ -603,6 +637,12 @@ tracts18 <-
   mutate(percentWhite = NumberWhites / TotalPop,
          raceContext = ifelse(percentWhite > .5, "Majority_White", "Majority_Non_White")) %>%
   .[neighborhoods,]
+
+ggplot()+
+  geom_sf(data = tracts18, aes(fill = raceContext)) +
+  scale_fill_manual(values = c("#25CB10", "#FA7800"), name="Race Context") +
+  labs(title = "Income Context") +
+  mapTheme() + theme(legend.position="bottom")
 
 reg.summary %>% 
   filter(str_detect(Regression, "LOGO")) %>%
