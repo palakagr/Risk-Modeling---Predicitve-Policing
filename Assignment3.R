@@ -75,24 +75,6 @@ crime_net <-
          cvID = sample(round(nrow(fishnet) / 24), 
                        size=nrow(fishnet), replace = TRUE))
 
-domestic_net <-
-  dplyr::select(DomesticViolence) %>% 
-  mutate(countDom = 1) %>% 
-  aggregate(., fishnet, sum) %>%
-  mutate(countDom = replace_na(countDom, 0),
-         uniqueID = rownames(.),
-         cvID = sample(round(nrow(fishnet) / 24), 
-                       size=nrow(fishnet), replace = TRUE))
-
-drug_net <-
-  dplyr::select(drug) %>% 
-  mutate(countDrug = 1) %>% 
-  aggregate(., fishnet, sum) %>%
-  mutate(countDrug = replace_na(countDrug, 0),
-         uniqueID = rownames(.),
-         cvID = sample(round(nrow(fishnet) / 24), 
-                       size=nrow(fishnet), replace = TRUE))
-
 ggplot() +
   geom_sf(data = crime_net, aes(fill = countAssualt), color = NA) +
   scale_fill_viridis() +
@@ -209,6 +191,15 @@ drug <-
   st_transform('ESRI:102241') %>% 
   distinct()
 
+drug_net <-
+  dplyr::select(drug) %>% 
+  mutate(countDrug = 1) %>% 
+  aggregate(., fishnet, sum) %>%
+  mutate(countDrug = replace_na(countDrug, 0),
+         uniqueID = rownames(.),
+         cvID = sample(round(nrow(fishnet) / 24), 
+                       size=nrow(fishnet), replace = TRUE)) 
+
 ggplot() +
   geom_sf(data=sfbase, fill="black") +
   geom_sf(data=assualt, colour="red", size=.75)+
@@ -221,6 +212,15 @@ DomesticViolence <-
   st_as_sf(coords = c("x", "y"), crs = 4326, agr = "constant")%>%
   st_transform('ESRI:102241') %>% 
   distinct()
+
+domestic_net <-
+  dplyr::select(DomesticViolence) %>% 
+  mutate(countDom = 1) %>% 
+  aggregate(., fishnet, sum) %>%
+  mutate(countDom = replace_na(countDom, 0),
+         uniqueID = rownames(.),
+         cvID = sample(round(nrow(fishnet) / 24), 
+                       size=nrow(fishnet), replace = TRUE))
 
 ggplot() +
   geom_sf(data=sfbase, fill="black") +
@@ -305,32 +305,34 @@ Streetlights_coord <- data.frame(st_c(Streetlights)) %>% na.omit()
 NoiseReport_coord <- data.frame(st_c(NoiseReport)) %>% na.omit()
 Bars_coord <- data.frame(st_c(bars)) %>% na.omit()
 Parks_coord <- data.frame(st_c(parks)) %>% na.omit()
-
+Liquor_coord <- data.frame(st_c(Liquor)) %>% na.omit()
 
 ## create NN from abandoned cars
 
-## try one with 3
+## Nearest neighbor function
 vars_net <-
   vars_net %>%
   mutate(
-    Encampments.nn3 =
-      nn_function(st_c(st_coid(vars_net)), Encampments_coord,3),
-    Abandoned_Cars.nn3 =
-      nn_function(st_c(st_coid(vars_net)), AbandonedCar_coord,3),
-    Graffiti.nn3 =
-      nn_function(st_c(st_coid(vars_net)), Graffiti_coord,3),
-    Bars.nn3 =
+    Encampments.nn =
+      nn_function(st_c(st_coid(vars_net)), Encampments_coord,2),
+    Abandoned_Cars.nn =
+      nn_function(st_c(st_coid(vars_net)), AbandonedCar_coord,5),
+    Graffiti.nn =
+      nn_function(st_c(st_coid(vars_net)), Graffiti_coord,5),
+    Bars.nn =
       nn_function(st_c(st_coid(vars_net)), Bars_coord,3),
-    Streetlights.nn3 = 
-      nn_function(st_c(st_coid(vars_net)), Streetlights_coord,3),
-    NoiseReport.nn3 =
-      nn_function(st_c(st_coid(vars_net)), NoiseReport_coord,3),
-    Parks.nn3 =
-      nn_function(st_c(st_coid(vars_net)), Parks_coord,3))
+    Streetlights.nn = 
+      nn_function(st_c(st_coid(vars_net)), Streetlights_coord,5),
+    NoiseReport.nn =
+      nn_function(st_c(st_coid(vars_net)), NoiseReport_coord,2),
+    Parks.nn =
+      nn_function(st_c(st_coid(vars_net)), Parks_coord,1),
+    Liquor.nn =
+      nn_function(st_c(st_coid(vars_net)), Liquor_coord,1))
 
 ## Plot nearest neighbor
 vars_net.long.nn <- 
-  dplyr::select(vars_net, ends_with(".nn3")) %>%
+  dplyr::select(vars_net, ends_with(".nn")) %>%
   gather(Variable, value, -geometry)
 
 vars <- unique(vars_net.long.nn$Variable)
@@ -374,12 +376,6 @@ final_net <-
 
 mapview::mapview(final_net, zcol = "district")
 mapview::mapview(final_net, zcol = "name")
-
-ggplot() + 
-  geom_sf(data=final_net, aes(fill=factor(district)), colour=NA) 
-
-ggplot() + 
-  geom_sf(data=final_net, aes(fill=factor(name)), colour=NA) 
 
 ## Local Moran I's
 final_net.nb <- poly2nb(as_Spatial(final_net), queen=TRUE)
@@ -451,12 +447,12 @@ ggplot(correlation.long, aes(Value, countAssualt)) +
   plotTheme()
 
 ## Regression
-reg.vars <- c("Encampments.nn3", "Abandoned_Cars.nn3", "Graffiti.nn3", 
-              "Bars.nn3", "Streetlights.nn3", "NoiseReport.nn3", "Parks.nn3",
+reg.vars <- c("Encampments.nn", "Abandoned_Cars.nn", "Graffiti.nn", 
+              "Bars.nn", "Streetlights.nn", "NoiseReport.nn", "Parks.nn",
               "loopDistance")
 
-reg.ss.vars <- c("Encampments.nn3", "Abandoned_Cars.nn3", "Graffiti.nn3", 
-                 "Bars.nn3", "Streetlights.nn3", "NoiseReport.nn3", "Parks.nn3",
+reg.ss.vars <- c("Encampments.nn", "Abandoned_Cars.nn", "Graffiti.nn", 
+                 "Bars.nn", "Streetlights.nn", "NoiseReport.nn", "Parks.nn",
                  "loopDistance", "Assualt.isSig", "Assualt.isSig.dist")
 
 crossValidate <- function(dataset, id, dependentVariable, indVariables) {
