@@ -1,4 +1,4 @@
-# Risk Modeling - Predicitve Policing
+# Risk Modeling - Predictive Policing
 ### Palak Agarwal  
 #### MUSA 508 - Public Policy
 
